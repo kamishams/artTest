@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Artistic SVG Path</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css" integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls" crossorigin="anonymous">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Ruda:wght@400..900&display=swap');
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>  
+  <style>
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+      background: #030303; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      font-family: Ruda;
+    }
+    canvas { 
+      display: block; 
+      border: 1px solid #333; 
+    }
+    .controls {
+      position: absolute;
+      top: 0px;
+      left: 0px;
+      background: rgba(0, 0, 0, 1);
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(255, 255, 255, 0.2);
+      color: white;
+      font-weight: 400;
+      font-size: 10px;
+      cursor: grab; /* Indique que l'élément est déplaçable */
+      z-index: 1000; /* Toujours au-dessus des autres éléments */
+      width: 280px;
+    }
+    .controls label {
+        text-transform: uppercase; /* Change le curseur lorsqu'on glisse */
+        opacity: 0.8; /* Ajoute un effet visuel pendant le déplacement */
+    }
+    .control-item {
+      margin: 10px;
+    }
+    .control-item label { margin-right: 10px; }
+    .control-item input, select, button{
+      background: #222;
+      color: white;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 2px;
+      font-size: 10px;
+    }
+    .control-item input[type="range"]{
+      width: 100%;
+    }
+    .control-item input[type="file"]{
+      width: 80%;
+    }
+    #hueValue {
+      position: relative;
+      height: 10px;
+    }
+
+    #hueValue .noUi-connect {
+      background: transparent; /* La zone connectée n'altère pas le fond */
+    }
+
+    #hueValue .noUi-base {
+      background: linear-gradient(to right,
+        rgb(255, 0, 0), 
+        rgb(255, 255, 0), 
+        rgb(0, 255, 0), 
+        rgb(0, 255, 255), 
+        rgb(0, 0, 255), 
+        rgb(255, 0, 255), 
+        rgb(255, 0, 0)
+      );
+      border-radius: 10px;
+    }
+    .hidden {
+        display: none;
+    }
+
+    .drag-handle {
+        cursor: grab; /* Affiche la main "grab" */
+        background: #090909; /* Conserve un fond distinct */
+        padding: 10px;
+        text-align: left;
+        font-weight: bold;
+        color: rgb(114, 114, 114);
+    }
+
+    /* Lorsque la zone est cliquée et glissée */
+    .drag-handle:active {
+        cursor: grabbing; /* Affiche la main en mode "grabbing" */
+    }
+
+    /* Désactive le curseur sur les autres parties */
+    .controls {
+        cursor: default; /* Curseur normal ailleurs */
+    }
+  </style>
+</head>
+<body>
+  <svg id="defaultSVG" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" style="display:none;">
+    <path class="st0" d="M512,306c55,0,106.8,21.4,145.7,60.3,38.9,38.9,60.3,90.6,60.3,145.7s-21.4,106.8-60.3,145.7c-38.9,38.9-90.6,60.3-145.7,60.3s-106.8-21.4-145.7-60.3c-38.9-38.9-60.3-90.6-60.3-145.7s21.4-106.8,60.3-145.7c38.9-38.9,90.6-60.3,145.7-60.3M512,256c-141.4,0-256,114.6-256,256s114.6,256,256,256,256-114.6,256-256-114.6-256-256-256h0Z"/>
+  </svg>
+  <canvas id="canvas"></canvas>
+  <div class="controls">
+    <div class="drag-handle">S.E.T.I.N.G.S <!-- Zone dédiée au déplacement -->
+        <div class="control-item">
+            <h4>Statistics</h4>
+            <ul id="stats">
+                <li>Circles: <span id="stats-circles">0</span></li>
+                <li>Connections: <span id="stats-connections">0</span></li>
+                <li>Average Distance: <span id="stats-average-distance">0</span></li>
+                <li>Longest Connection: <span id="stats-longest">0</span></li>
+                <li>Shortest Connection: <span id="stats-shortest">0</span></li>
+            </ul>
+        </div>
+    </div>
+    <div class="control-item">
+        <input type="file" id="svgUpload" accept="image/svg+xml" class="form-control">
+      </div>
+      <div class="control-item">
+        <input type="text" id="seed-value" placeholder="SEED ME">
+        <button id="regenerateRandom" class="btn btn-warning btn-sm">Regenerate Random Values</button> <!-- Nouveau bouton -->
+      </br></br>
+        <label for="animateLines">Line Motion:</label>
+        <input type="checkbox" id="animateLines">
+      </div>
+    <div class="control-item">
+      <label for="colorMode">Color Mode:</label>
+      <select id="colorMode" class="btn btn-secondary btn-sm dropdown-toggle">
+        <option value="gradientGlobal">Simple Gradient</option>
+        <option value="plainBlack">Noir</option>
+        <option value="plainWhite">Blanc</option>
+        <option value="dynamicTransition">Dynamic Gradient</option>
+        <option value="lightEffect">Light Effect</option>
+        <option value="sizeGradient">Size Gradient</option>
+      </select>
+    </div>
+    <div class="control-item">
+      <label for="connectionSelector">Connection Sequence:</label>
+      <select id="connectionSelector" class="btn btn-secondary btn-sm dropdown-toggle">
+        <option value="linear">linear</option>
+        <option value="logarithmic">logarithmic</option>
+        <option value="fibonacci">fibonacci</option>
+        <option value="lucas">lucas</option>
+        <option value="powersOfTwo">powersOfTwo</option>
+      </select>
+    </div>
+    <div class="control-item">
+      <label for="hueValue">Hue RanValue:</label>
+      <div id="hueValue" style="margin-top: 10px;"></div>
+      <span id="hueValue-value">0 - 50</span>
+    </div>   
+    <div class="control-item">
+      <label for="hueRangeSlider">Hue Range (Dynamic Gradient & Size Gradient) :</label>
+      <input type="range" id="hueRangeSlider" min="1" max="127" step="1" value="50" class="form-range">
+      <span id="hueRangeSlider-value">50</span> <!-- Pour afficher la valeur -->
+    </div> 
+    <div class="control-item">
+      <label for="bezierCurvature">Bézier Curvature:</label>
+      <input type="range" id="bezierCurvature" min="-0.25" max="0.25" step="0.01" value="0" class="form-range">
+      <span id="bezierCurvature-value">0</span> <!-- Pour afficher la valeur -->
+    </div>
+    <div class="control-item">
+      <label for="circleDensity">Circle Density:</label>
+      <input type="range" id="circleDensity" min="1" max="20"  max="0.5" step="0.02" value="7" class="form-range">
+      <span id="circleDensity-value">7</span> <!-- Pour afficher la valeur -->
+    </div>
+    <div class="control-item">
+      <label for="circleSize">Max Circle Size:</label>
+      <input type="range" id="circleSize" min="4" max="40" step="1" value="10" class="form-range">
+      <span id="circleSize-value">10</span> <!-- Pour afficher la valeur -->
+    </div>
+    <div class="control-item">
+      <label for="circleDistance">Max Circle Distance:</label>
+      <input type="range" id="circleDistance" min="10" max="600" step="1" value="228" class="form-range">
+      <span id="circleDistance-value">228</span> <!-- Pour afficher la valeur -->
+    </div>
+    <div class="control-item">
+      <label for="lineConnections">Max Line Connections:</label>
+      <input type="range" id="lineConnections" min="0" max="10" value="10" class="form-range">
+      <span id="lineConnections-value">10</span> <!-- Pour afficher la valeur -->
+    </div>
+    <div class="control-item">
+      <label for="lineThickness">Line Thickness:</label>
+      <input type="range" id="lineThickness" min="0.1" max="3" step="0.1" value="0.5" class="form-range">
+      <span id="lineThickness-value">0.5</span> <!-- Pour afficher la valeur -->
+    </div>
+    <div class="control-item">
+      <label for="lineOpacity">Line Opacity:</label>
+      <input type="range" id="lineOpacity" min="0.1" max="1" step="0.1" value="0.9" class="form-range">
+      <span id="lineOpacity-value">0.9</span> <!-- Pour afficher la valeur -->
+    </div>
+    <div class="control-item">
+      <label for="circleOpacity">Circle Opacity:</label>
+      <input type="range" id="circleOpacity" min="0.1" max="1" step="0.1" value="1" class="form-range">
+      <span id="circleOpacity-value">-</span> <!-- Pour afficher la valeur -->
+    </div>
+    <div class="control-item">
+      <button id="saveImage" class="btn btn-primary btn-sm">Save as Image</button>
+    </div>
+  </div>
+  <script>
+
+   
+
+class RNG {
+    /**
+     * Constructeur de la classe RNG.
+     * Initialise la graine (seed) utilisée pour le générateur de nombres pseudo-aléatoires.
+     * @param {string} seed - La graine initiale sous forme de chaîne de caractères. Si non fournie, 'default' est utilisée.
+     */
+    constructor(seed) {
+        // Transforme la graine en un entier via la méthode hashCode.
+        this.seed = this.hashCode(seed || 'default');
+    }
+
+    /**
+     * Génère un code de hachage (hash) basé sur une chaîne de caractères.
+     * @param {string} str - La chaîne de caractères à convertir en hash.
+     * @returns {number} - Un entier signé 32 bits représentant le hash de la chaîne.
+     */
+    hashCode(str) {
+        let hash = 0;
+        // Parcourt chaque caractère de la chaîne.
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i); // Obtient le code ASCII du caractère.
+            hash = ((hash << 5) - hash) + char; // Décalage à gauche de 5 bits et additionne le code du caractère.
+            hash |= 0; // Force le résultat à rester dans la plage des entiers signés 32 bits.
+        }
+        return hash;
+    }
+
+    /**
+     * Génère le prochain nombre pseudo-aléatoire.
+     * @returns {number} - Un nombre flottant compris entre 0 (inclus) et 1 (exclus).
+     */
+    next() {
+        // Modifie la graine avec une constante additive (0x6D2B79F5).
+        let t = this.seed += 0x6D2B79F5;
+
+        // Applique des opérations de hachage pour introduire de la variabilité.
+        t = Math.imul(t ^ (t >>> 15), 1 | t); // Décale les bits à droite et applique un XOR.
+
+        // Normalise le résultat pour obtenir un nombre entre 0 et 1.
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296; // Conversion en entier non signé sur 32 bits.
+    }
+}
+
+
+
+    class CanvasManager {
+      constructor() {
+        this.key = document.getElementById('seed-value').value; // Clé initiale
+        this.rng = new RNG(this.key);
+
+        this.canvas = document.getElementById('canvas');
+        this.ctx = this.canvas.getContext('2d', { alpha: true, willReadFrequently: true });
+        this.circles = [];
+        this.paths = [];
+        this.connectionCurvatures = []; // Stockage des courbures aléatoires pour chaque connexion
+        this.connections = []; // Nouvelle propriété pour stocker les connexions
+        this.randomValues = []; // Stocker les valeurs aléatoires (angles et distances)
+        this.settings = {
+          circleDensity: 7,
+          circleSize: 10,
+          circleDistance: 228,
+          lineConnections: 10,
+          lineThickness: 0.5,
+          lineOpacity: 0.9,
+          circleOpacity: 1,
+          colorMode: 'gradientGlobal',
+          bezierCurvature: 0,
+          colors: ['#FF00CC', '#FFCC00', '#000000'],
+          connectionSequence: 'linear', // Ajouter la séquence par défaut
+          animateLines: false, // Nouvel état pour l'animation
+        };
+
+        this.findClosestCircles = this.findClosestCircles.bind(this);
+        this.lineDashOffset = 0; // Décalage initial pour les lignes
+        this.isAnimating = false; // État de l'animation
+
+        this.loadDefaultPath(); // Charger le path au démarrage
+        this.initializeControls();
+        this.setupEventListeners();
+        this.resizeCanvas();
+        this.startAnimationLoop(); // Démarre la boucle d’animation
+      }
+
+      loadDefaultPath() {
+          const svgElement = document.getElementById('defaultSVG');
+          const pathElement = svgElement.querySelector('path');
+
+          if (pathElement) {
+              const pathLength = pathElement.getTotalLength();
+              const samplingFrequency = 30; // Ajuste pour définir la densité des points
+              this.paths = [];
+
+              for (let i = 0; i <= pathLength; i += samplingFrequency) {
+                  const point = pathElement.getPointAtLength(i);
+                  this.paths.push({ x: point.x, y: point.y });
+              }
+
+              // Centrer et générer les cercles après avoir chargé le path
+              this.centerSVG();
+              this.generateCirclesFromPath(true);
+          }
+      }
+
+
+      setKey(newKey) {
+        this.key = newKey;
+        this.rng = new RNG(this.key);
+        this.generateRandomValues(); // Recalculer avec la nouvelle clé
+        this.drawCanvas();
+      }
+
+      generateRandomValues() {
+        this.randomValues = [];
+        for (let i = 0; i < this.paths.length; i++) {
+          const randomValuesForPoint = [];
+          for (let j = 0; j < this.settings.circleDensity; j++) {
+            const angle = this.rng.next() * 2 * Math.PI;
+            const distance = this.rng.next() * this.settings.circleDistance;
+            randomValuesForPoint.push({ angle, distance });
+          }
+          this.randomValues.push(randomValuesForPoint);
+        }
+      }
+
+      updateStats() {
+          const circleCount = this.circles.length;
+          let connectionCount = 0;
+          let totalDistance = 0;
+          let longestConnection = 0;
+          let shortestConnection = Infinity;
+
+          // Parcourir les connexions pour collecter des données
+          for (let i = 0; i < this.connections.length; i++) {
+              const neighbors = this.connections[i];
+              connectionCount += neighbors.length;
+
+              for (let j = 0; j < neighbors.length; j++) {
+                  const circle = this.circles[i];
+                  const neighbor = neighbors[j];
+                  const distX = neighbor.x - circle.x;
+                  const distY = neighbor.y - circle.y;
+                  const distance = Math.sqrt(distX * distX + distY * distY);
+
+                  totalDistance += distance;
+                  if (distance > longestConnection) longestConnection = distance;
+                  if (distance < shortestConnection) shortestConnection = distance;
+              }
+          }
+
+          const averageDistance = connectionCount > 0 ? totalDistance / connectionCount : 0;
+
+          // Mettre à jour les statistiques dans l'interface utilisateur
+          document.getElementById('stats-circles').innerText = circleCount;
+          document.getElementById('stats-connections').innerText = connectionCount;
+          document.getElementById('stats-average-distance').innerText = averageDistance.toFixed(2);
+          document.getElementById('stats-longest').innerText = longestConnection.toFixed(2);
+          document.getElementById('stats-shortest').innerText = shortestConnection.toFixed(2);
+      }
+
+      initializeControls() {
+            const controlIds = [
+                'circleDensity', 'circleSize', 'circleDistance', 
+                'lineConnections', 'lineThickness', 'lineOpacity', 
+                'circleOpacity', 'bezierCurvature', 'hueRangeSlider', 'seed'
+            ];
+
+            
+
+            // Initialiser le slider pour Hue Range avec une plage fixe de 50
+            const hueValue = document.getElementById('hueValue');
+            const hueRangeValue = document.getElementById('hueRangeSlider');
+            const fixedRange = parseInt(hueRangeValue.value); // Taille constante de la plage
+
+            noUiSlider.create(hueValue, {
+              start: [0], // Position initiale de la borne inférieure
+              range: {
+                min: 0,
+                max: 255 // S'assurer que la plage supérieure ne dépasse pas 255
+              },
+              step: 1, // Pas
+              connect: [true, false], // Afficher une connexion à gauche
+              tooltips: [true], // Afficher la valeur actuelle
+              format: {
+                to: (value) => Math.round(value),
+                from: (value) => parseFloat(value)
+              }
+            });
+
+            // Mettre à jour les bornes minHue et maxHue lorsque le slider bouge
+            hueValue.noUiSlider.on('update', (values) => {
+              let minHue = parseInt(hueValue.noUiSlider.get());
+              let maxHue = minHue + parseInt(hueRangeValue.value);
+
+              // Gestion du rebouclage si minHue ou maxHue sort des limites
+              if (minHue < 0) {
+                minHue = 255 + (minHue % 255);
+              } else if (minHue > 255) {
+                minHue = minHue % 255;
+              }
+
+              if (maxHue < 0) {
+                maxHue = 255 + (maxHue % 255);
+              } else if (maxHue > 255) {
+                maxHue = maxHue % 255;
+              }
+
+              // Corriger les dégradés pour garantir un cycle visuel cohérent
+              if (minHue > maxHue) {
+                this.settings.gradientColors = this.createCyclicGradient(minHue, maxHue);
+              } else {
+                this.settings.gradientColors = this.createLinearGradient(minHue, maxHue);
+              }
+
+              this.settings.minHue = minHue;
+              this.settings.maxHue = maxHue;
+              
+              // Afficher la plage sélectionnée
+              document.getElementById('hueValue-value').innerText = `${minHue} - ${maxHue}`;
+
+              // Rafraîchir le canevas en live
+              requestAnimationFrame(() => this.drawCanvas());
+            });
+
+            document.getElementById('hueRangeSlider').addEventListener('input', (e) => {
+                              
+                let minHue = parseInt(hueValue.noUiSlider.get());
+                let maxHue = minHue + parseInt(hueRangeValue.value);
+
+                // Gestion du rebouclage si minHue ou maxHue sort des limites
+                if (minHue < 0) {
+                  minHue = 255 + (minHue % 255);
+                } else if (minHue > 255) {
+                  minHue = minHue % 255;
+                }
+
+                if (maxHue < 0) {
+                  maxHue = 255 + (maxHue % 255);
+                } else if (maxHue > 255) {
+                  maxHue = maxHue % 255;
+                }
+
+                // Corriger les dégradés pour garantir un cycle visuel cohérent
+                if (minHue > maxHue) {
+                  this.settings.gradientColors = this.createCyclicGradient(minHue, maxHue);
+                } else {
+                  this.settings.gradientColors = this.createLinearGradient(minHue, maxHue);
+                }
+
+                this.settings.minHue = minHue;
+                this.settings.maxHue = maxHue;
+                
+                requestAnimationFrame(() => this.drawCanvas());
+            });
+
+            
+
+            document.querySelector('.controls').addEventListener('input', (e) => {
+              if (controlIds.includes(e.target.id)) {
+                  this.settings[e.target.id] = parseFloat(e.target.value);
+                  document.querySelector(`#${e.target.id}-value`).innerText = e.target.value; // Update displayed value
+
+                  if (e.target.id === 'lineConnections') {
+                      this.calculateConnections(); // Recalculer les connexions
+                  }
+
+                  requestAnimationFrame(() => this.drawCanvas());
+                  if (['circleDensity', 'circleDistance', 'circleSize'].includes(e.target.id)) {
+                      this.generateCirclesFromPath(false); // Mettre à jour les cercles sans recalculer les valeurs aléatoires
+                  }
+
+              }
+          });
+
+          document.getElementById('saveImage').addEventListener('click', () => {
+              const exportScale = 4; // Échelle de résolution x4
+
+              // Création d'un canvas temporaire pour l'export
+              const tempCanvas = document.createElement('canvas');
+              const tempCtx = tempCanvas.getContext('2d');
+
+              // Dimensions basées sur l'échelle de résolution
+              tempCanvas.width = this.canvas.width * exportScale;
+              tempCanvas.height = this.canvas.height * exportScale;
+
+              // Appliquer l'échelle au contexte temporaire
+              tempCtx.scale(exportScale, exportScale);
+
+              // Redessiner tous les éléments graphiques sur le canvas temporaire
+              tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+              // Redessiner les cercles et les connexions avec la nouvelle échelle
+              this.drawCanvas(tempCtx); // Vous devez modifier la méthode drawCanvas pour accepter un contexte personnalisé
+
+              // Générer un nom de fichier dynamique
+              const key = this.key || "default_key"; // Clé de cryptage (ou valeur par défaut)
+              const settings = [
+                  `density-${this.settings.circleDensity}`,
+                  `size-${this.settings.circleSize}`,
+                  `distance-${this.settings.circleDistance}`,
+                  `opacity-${this.settings.lineOpacity.toFixed(2)}`
+              ].join('_');
+              const fileName = `canvas-${key}-${settings}.png`; // Exemple : canvas-default_key-density-7_size-20_distance-228_opacity-0.20.png
+
+              // Exporter le canvas temporaire sous forme d'image
+              const link = document.createElement('a');
+              link.download = fileName; // Nom dynamique
+              link.href = tempCanvas.toDataURL('image/png'); // Format PNG
+              link.click();
+          });
+
+          
+            document.getElementById('colorMode').addEventListener('change', (e) => {
+                this.settings.colorMode = e.target.value; // Met à jour le mode de couleur
+                requestAnimationFrame(() => this.drawCanvas()); // Rafraîchir le canevas
+            });
+
+
+
+            // Bouton pour régénérer les valeurs aléatoires
+            document.getElementById('regenerateRandom').addEventListener('click', () => {
+                
+                this.key = document.getElementById('seed-value').value || "default_key"; // Clé de cryptage (ou valeur par défaut)
+                this.generateRandomValues(); // Recalculer les valeurs aléatoires
+                this.generateCirclesFromPath(false); // Mettre à jour les cercles
+                requestAnimationFrame(() => this.drawCanvas());
+            });
+
+            document.getElementById('connectionSelector').addEventListener('change', (e) => {
+                this.settings.connectionSequence = e.target.value; // Met à jour la séquence
+                this.calculateConnections(); // Recalcule les connexions avec la nouvelle séquence
+                requestAnimationFrame(() => this.drawCanvas()); // Redessine le canvas
+            });
+
+            document.getElementById('animateLines').addEventListener('change', (e) => {
+                this.settings.animateLines = e.target.checked;
+                this.isAnimating = this.settings.animateLines;
+
+                if (this.isAnimating) {
+                    this.startAnimationLoop(); // Démarre l’animation si activée
+                }
+            });
+        }
+
+
+      setupEventListeners() {
+        document.getElementById('svgUpload').addEventListener('change', this.handleSVGUpload.bind(this));
+        
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => this.resizeCanvas(), 250);
+        });
+
+        // Gestionnaire pour la touche "H" pour masquer/afficher les contrôles
+        window.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'h') { // Vérifie si la touche pressée est "H"
+                const controls = document.querySelector('.controls');
+                if (controls) {
+                    controls.classList.toggle('hidden'); // Ajoute ou enlève la classe "hidden"
+                }
+            }
+        });
+        
+      }
+
+      startAnimationLoop() {
+          if (!this.isAnimating) return;
+
+          // Incrémenter le décalage des pointillés
+          this.lineDashOffset = (this.lineDashOffset + 0.1); // Modifie 2 et 20 pour ajuster la vitesse et l’espacement
+
+          // Redessiner le canvas
+          this.drawCanvas();
+
+          // Refaire l’animation
+          requestAnimationFrame(() => this.startAnimationLoop());
+      }
+
+      createLinearGradient(minHue, maxHue) {
+          const gradient = [];
+          for (let i = minHue; i <= maxHue; i++) {
+              gradient.push(`hsl(${i}, 100%, 50%)`);
+          }
+          return gradient;
+      }
+
+      createCyclicGradient(minHue, maxHue) {
+          const gradient = [];
+          for (let i = minHue; i <= 255; i++) {
+              gradient.push(`hsl(${i}, 100%, 50%)`);
+          }
+          for (let i = 0; i <= maxHue; i++) {
+              gradient.push(`hsl(${i}, 100%, 50%)`);
+          }
+          return gradient;
+      }
+
+
+      resizeCanvas() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+        
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        
+        if (this.paths.length > 0) {
+            this.centerSVG();
+            this.generateCirclesFromPath(true);
+            this.drawCanvas();
+        }
+      }
+
+      handleSVGUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(e.target.result, 'image/svg+xml');
+          const svgPaths = svgDoc.querySelectorAll('path');
+          
+          this.paths = [];
+          svgPaths.forEach(path => {
+            const pathLength = path.getTotalLength();
+            const samplingFrequency = 30;
+            for (let i = 0; i < pathLength; i += samplingFrequency) {
+              const point = path.getPointAtLength(i);
+              this.paths.push({ x: point.x, y: point.y });
+            }
+          });
+
+          this.centerSVG();
+          this.generateRandomValues(); // Générer les valeurs aléatoires
+          this.generateCirclesFromPath(true); // Générer les cercles
+          this.drawCanvas();
+        };
+        reader.readAsText(file);
+      }
+
+      centerSVG() {
+        if (this.paths.length === 0) return;
+
+        const { minX, minY, maxX, maxY } = this.paths.reduce(
+          (acc, point) => ({
+            minX: Math.min(acc.minX, point.x),
+            minY: Math.min(acc.minY, point.y),
+            maxX: Math.max(acc.maxX, point.x),
+            maxY: Math.max(acc.maxY, point.y)
+          }),
+          { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+        );
+
+        const svgWidth = maxX - minX;
+        const svgHeight = maxY - minY;
+
+        // Determine the scaling factor to fit the SVG to 50% of the canvas width or height
+        const scaleFactor = Math.min(
+          (this.canvas.width * 0.5) / svgWidth,
+          (this.canvas.height * 0.5) / svgHeight
+        );
+
+        const offsetX = (this.canvas.width - svgWidth * scaleFactor) / 2 - minX * scaleFactor;
+        const offsetY = (this.canvas.height - svgHeight * scaleFactor) / 2 - minY * scaleFactor;
+
+        for (let i = 0; i < this.paths.length; i++) {
+          this.paths[i].x = this.paths[i].x * scaleFactor + offsetX;
+          this.paths[i].y = this.paths[i].y * scaleFactor + offsetY;
+        }
+      }
+
+      generateRandomValues() {
+        // Générer des angles et des distances aléatoires pour chaque point du chemin
+        this.randomValues = [];
+        for (let i = 0; i < this.paths.length; i++) {
+          const randomValuesForPoint = [];
+          for (let j = 0; j < this.settings.circleDensity; j++) {
+            const angle = this.rng.next() * 2 * Math.PI;
+            const distance = this.rng.next() * this.settings.circleDistance;
+            randomValuesForPoint.push({ angle, distance });
+          }
+          this.randomValues.push(randomValuesForPoint);
+        }
+      }
+
+      generateCircleRNG(circleId) {
+          // Combine la clé et l'ID du cercle
+          const combinedKey = `${this.key}_${circleId}`;
+          return new RNG(combinedKey); // Génère un RNG unique
+      }
+
+      generateCirclesFromPath(recalculateRandom = false) {
+        this.circles.length = 0; // Reset the circles array
+        this.connections.length = 0; // Réinitialiser les connexions
+
+        if (this.paths.length === 0) return;
+
+        // Optionally regenerate random values
+        if (recalculateRandom) {
+            this.generateRandomValues();
+        }
+
+        const sampleInterval = Math.max(1, Math.floor(this.paths.length / (this.settings.circleDensity * 20)));
+
+        for (let i = 0; i < this.paths.length; i += sampleInterval) {
+            const point = this.paths[i];
+            const randomValuesForPoint = this.randomValues[i] || [];
+
+            for (let j = 0; j < this.settings.circleDensity; j++) {
+                // Générer un RNG unique pour ce cercle
+                const circleRNG = this.generateCircleRNG(`${i}_${j}`);
+
+                // Calculer l'angle et la distance en fonction du RNG
+                const angle = circleRNG.next() * 2 * Math.PI;
+                const distance = circleRNG.next() * this.settings.circleDistance;
+
+                // Probability decreases with distance
+                const steepness = 30; // Plus grand = transition plus brutale
+                const midpoint = 0.05; // Contrôle où la probabilité chute
+                const normalizedDistance = distance / this.settings.circleDistance;
+                const distanceFactor = 1 / (1 + Math.exp(-steepness * (midpoint - normalizedDistance)));
+
+
+
+
+                // Random size with probability distribution
+                const size = this.calculateCircleSize(distanceFactor);
+
+                const newX = point.x + Math.cos(angle) * distance;
+                const newY = point.y + Math.sin(angle) * distance;
+
+                this.circles.push({ 
+                    x: newX, 
+                    y: newY, 
+                    size,
+                    color: this.getCircleColor({ x: newX, y: newY, size })
+                });
+            }
+        }
+        // Calculer les connexions pour tous les cercles
+        this.calculateConnections();
+
+        // Mettre à jour les statistiques
+        this.updateStats();
+    }
+
+    calculateConnections() {
+        this.connections = this.circles.map((circle) => {
+            const neighbors = this.findClosestCirclesWithSequence(
+                circle,
+                this.settings.connectionSequence,
+                this.settings.lineConnections
+            );
+
+            return neighbors;
+        });
+
+        // Générer les courbures aléatoires pour chaque connexion
+        this.connectionCurvatures = this.connections.map((neighbors) =>
+            neighbors.map(() => {
+                // Génère une valeur aléatoire entre -1 et 1
+                const randomCurvature = (this.rng.next() * 2) - 1;
+
+                // Applique un facteur multiplicatif pour amplifier ou atténuer la variation (optionnel)
+                const factor = 2; // Ajuste ce facteur pour influencer l'amplitude de la variation
+                return randomCurvature * factor;
+            })
+        );
+
+        // Mettre à jour les statistiques
+        this.updateStats();
+    }
+
+
+
+      updateCirclesFromPath() {
+        this.circles.length = 0; // Reset the circles array
+
+        if (this.paths.length === 0) return;
+
+        const sampleInterval = Math.max(1, Math.floor(this.paths.length / (this.settings.circleDensity * 20)));
+        
+        for (let i = 0; i < this.paths.length; i += sampleInterval) {
+          const point = this.paths[i];
+          const randomValuesForPoint = this.randomValues[i] || [];
+
+          for (let j = 0; j < this.settings.circleDensity; j++) {
+            const { angle, distance } = randomValuesForPoint[j] || { angle: 0, distance: 0 };
+
+            // Probability decreases with distance
+            const distanceFactor = 1.5 - (distance / this.settings.circleDistance);
+
+            // Random size with probability distribution
+            const size = this.calculateCircleSize(distanceFactor);
+
+            const newX = point.x + Math.cos(angle) * distance;
+            const newY = point.y + Math.sin(angle) * distance;
+
+            this.circles.push({ 
+              x: newX, 
+              y: newY, 
+              size,
+              color: this.getCircleColor({ x: newX, y: newY, size })
+            });
+          }
+        }
+      }
+
+      calculateCircleSize(distanceFactor) {
+          const sizeBias = this.settings.sizeBias || 0.92; // Default to 95% small sizes
+
+          const randomFactor = this.rng.next();
+          if (randomFactor < sizeBias) {
+              // Small sizes, proportional to the distance factor
+              return this.rng.next() * (4 + distanceFactor * 4) + 1;
+          } else {
+              // Larger sizes
+              return this.rng.next() * (this.settings.circleSize - 10) + 10;
+          }
+      }
+
+      generateSequence(type, limit, invertFrequency = 50, randomFrequency = 1) {
+          let sequence = [];
+          
+          // Toujours calculer les 10 valeurs complètes
+          const maxLimit = 10;
+
+          switch (type) {
+              case 'fibonacci':
+                  sequence = [0, 1];
+                  while (sequence.length < maxLimit) {
+                      sequence.push(sequence.at(-1) + sequence.at(-2));
+                  }
+                  break;
+              case 'lucas':
+                  sequence = [2, 1];
+                  while (sequence.length < maxLimit) {
+                      sequence.push(sequence.at(-1) + sequence.at(-2));
+                  }
+                  break;
+              case 'powersOfTwo':
+                  for (let i = 0; i < maxLimit; i++) {
+                      sequence.push(2 ** i);
+                  }
+                  break;
+              case 'logarithmic':
+                  for (let i = 1; i <= maxLimit; i++) {
+                      sequence.push(Math.floor(Math.log2(i) * 10));
+                  }
+                  break;
+              default:
+                  sequence = Array.from({ length: maxLimit }, (_, i) => i + 1);
+          }
+
+          // Découper les 10 valeurs calculées à `limit`
+          sequence = sequence.slice(0, limit);
+
+          // Inverser une fois sur `invertFrequency`
+          if (this.rng.next() < 1 / invertFrequency) {
+              sequence = sequence.reverse(); // Inverser pour avoir les plus grandes valeurs en premier
+          }
+
+          // Connecter à un nombre aléatoire de cercles une fois sur `randomFrequency`
+          if (this.rng.next() < 1 / randomFrequency) {
+              const randomCount = Math.floor(this.rng.next() * limit) + 1; // Génère un nombre aléatoire entre 1 et `limit`
+              sequence = Array.from({ length: randomCount }, () => {
+                  return Math.floor(this.rng.next() * maxLimit) + 1; // Valeurs aléatoires entre 1 et 10
+              });
+          }
+
+          return sequence;
+      }
+
+
+
+      findClosestCirclesWithSequence(circle, sequenceType, maxIndex) {
+          const allCircles = this.circles
+              .filter(other => other !== circle)
+              .sort((a, b) => {
+                  const dxA = circle.x - a.x;
+                  const dyA = circle.y - a.y;
+                  const distA = Math.sqrt(dxA * dxA + dyA * dyA);
+
+                  const dxB = circle.x - b.x;
+                  const dyB = circle.y - b.y;
+                  const distB = Math.sqrt(dxB * dxB + dyB * dyB);
+
+                  return distA - distB;
+              });
+
+          let sequence;
+          const limit = Math.min(allCircles.length, maxIndex);
+          switch (sequenceType) {
+              case 'fibonacci':
+                  sequence = this.generateSequence('fibonacci',limit);
+                  break;
+              case 'lucas':
+                  sequence = this.generateSequence('lucas',limit);
+                  break;
+              case 'powersOfTwo':
+                  sequence = this.generateSequence('powersOfTwo',limit);
+                  break;
+              case 'logarithmic':
+                  sequence = this.generateSequence('logarithmic',limit);
+                  break;
+              default:
+                  sequence = Array.from({ length: maxIndex }, (_, i) => i); // Lineaire
+          }
+
+          return sequence.map(idx => allCircles[idx]).filter(Boolean); // Sélectionne les cercles
+      }
+
+
+      drawCanvas(ctx = this.ctx) {
+          ctx.imageSmoothingEnabled = false;
+
+          ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // Nettoyer le canvas
+
+          ctx.globalAlpha = this.settings.lineOpacity;
+          ctx.lineWidth = this.settings.lineThickness;
+
+          // Récupérer la séquence sélectionnée
+          const sequenceType = this.settings.connectionSequence || 'linear';
+          const maxIndex = Math.floor(this.settings.lineConnections);
+
+          for (let i = 0; i < this.circles.length; i++) {
+              const circle = this.circles[i];
+              const neighbors = this.connections[i]; // Utiliser les connexions stockées
+              const curvatures = this.connectionCurvatures[i]; // Récupérer les courbures associées
+
+              for (let j = 0; j < neighbors.length; j++) {
+                  const neighbor = neighbors[j];
+                  const curvatureFactor = curvatures[j]; // Courbure positive ou négative pour cette connexion
+
+                  // Calculer la distance entre les cercles
+                  const distX = neighbor.x - circle.x;
+                  const distY = neighbor.y - circle.y;
+                  const distance = Math.sqrt(distX * distX + distY * distY);
+
+                  // Calculer la somme des diamètres
+                  const diameterSum = circle.size + neighbor.size;
+
+                  // Normaliser la somme des diamètres sur une plage de 128 à 255
+                  const minGray = 96; // Gris le plus foncé
+                  const maxGray = 255; // Blanc
+                  const minDiameterSum = 1; // Diamètre minimum attendu
+                  const maxDiameterSum = 60; // Diamètre maximum attendu
+
+                  // Limiter la somme des diamètres à la plage définie
+                  const normalizedDiameter = Math.min(Math.max(diameterSum, minDiameterSum), maxDiameterSum);
+
+                  // Mapper la somme des diamètres sur la plage de 128 à 255
+                  const grayValue = Math.floor(
+                      minGray +
+                      ((normalizedDiameter - minDiameterSum) / (maxDiameterSum - minDiameterSum)) * (maxGray - minGray)
+                  );
+
+                  // Créer une couleur en niveaux de gris
+                  const grayColor = `rgb(${grayValue}, ${grayValue}, ${grayValue})`;
+
+                  // Calculer la valeur du pointillé en fonction de la distance
+                  const dashLength = 2; // Longueur fixe du trait
+                  const gapLength = distance * 0.04; // L'espace entre les pointillés est proportionnel à la distance
+                  ctx.setLineDash([dashLength, gapLength]); // Appliquer les pointillés calculés
+
+                  ctx.lineDashOffset = this.lineDashOffset; // Appliquer l'animation du décalage si nécessaire
+
+                  // Appliquer la couleur au trait
+                  ctx.strokeStyle = grayColor;
+
+                  ctx.beginPath();
+                  ctx.moveTo(circle.x, circle.y);
+
+                  // Appliquer la courbure avec le facteur
+                  const curvature = this.settings.bezierCurvature * curvatureFactor;
+                  const controlPointDistance = distance * curvature;
+                  const angle = Math.atan2(distY, distX) + Math.PI / 2;
+
+                  const controlX1 = circle.x + Math.cos(angle) * controlPointDistance;
+                  const controlY1 = circle.y + Math.sin(angle) * controlPointDistance;
+                  const controlX2 = neighbor.x + Math.cos(angle) * controlPointDistance;
+                  const controlY2 = neighbor.y + Math.sin(angle) * controlPointDistance;
+
+                  ctx.bezierCurveTo(
+                      controlX1, controlY1, 
+                      controlX2, controlY2, 
+                      neighbor.x, neighbor.y
+                  );
+
+                  ctx.stroke();
+              }
+          }
+
+          ctx.setLineDash([]); // Réinitialiser le dash pour dessiner les cercles
+
+          // Dessiner les cercles
+          ctx.globalAlpha = this.settings.circleOpacity;
+          for (let i = 0; i < this.circles.length; i++) {
+              const circle = this.circles[i];
+              circle.color = this.getCircleColor(circle); // Recalculer la couleur
+              ctx.beginPath();
+              ctx.arc(circle.x, circle.y, circle.size / 2, 0, Math.PI * 2);
+              ctx.fillStyle = circle.color;
+              ctx.fill();
+          }
+      }
+
+
+      getCircleColor(circle) {
+            const colorModes = {
+                gradientGlobal: () => {
+                    // Créer un dégradé linéaire sur toute la largeur du canevas
+                    const minHue = this.settings.minHue || 0;
+                    const gradient = this.ctx.createLinearGradient(0, 0, this.canvas.width, 0);
+                    gradient.addColorStop(0, '#FFFFFF');
+                    gradient.addColorStop(1, `hsl(${(minHue / 255) * 360}, 100%, 50%)`);
+
+                    // Retourner la couleur en fonction de la position horizontale du cercle
+                    return gradient;
+                },
+                plainBlack: () => {
+                  return `rgba(0, 0, 0, ${this.settings.circleOpacity})`;
+                },
+                plainWhite: () => {
+                  return `rgba(255, 255, 255, ${this.settings.circleOpacity})`;
+                },
+                dynamicTransition: () => {
+                  const minHue = this.settings.minHue || 0;
+                  const maxHue = this.settings.maxHue || 255;
+
+                  const rawHue = (Date.now() / 10 + circle.x + circle.y) % 256;
+                  const hue = ((rawHue - minHue + 256) % 256) % (maxHue - minHue) + minHue;
+
+                  return `hsl(${(hue / 255) * 360}, 100%, 50%)`; // Convertir en échelle HSL
+                },
+
+
+                lightEffect: () => {
+                    const lightX = this.canvas.width / 2;
+                    const lightY = this.canvas.height / 2;
+                    const dx = circle.x - lightX;
+                    const dy = circle.y - lightY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const brightness = Math.max(0, 255 - dist / 2);
+                    return `rgba(${brightness}, ${brightness}, ${brightness}, ${this.settings.circleOpacity})`;
+                },
+                sizeGradient: () => {
+                    const minHue = this.settings.minHue || 0;
+                    const maxHue = this.settings.maxHue || 255;
+
+                    // Définir une couleur en fonction de la taille du cercle
+                    const minSize = 1; // Taille minimale des cercles
+                    const maxSize = this.settings.circleSize; // Taille maximale des cercles
+                    const sizeRatio = (circle.size - minSize) / (maxSize - minSize); // Ratio de la taille
+
+                    // Interpolation linéaire entre minHue et maxHue
+                    const interpolatedHue = minHue + sizeRatio * (maxHue - minHue);
+
+                    // Génération de la couleur HSL
+                    const lightness = 95 - sizeRatio * 50; // Variation de la luminosité pour un effet visuel
+                    return `hsl(${interpolatedHue}, ${lightness}%, ${lightness}%)`;
+                }
+            };
+
+            return (colorModes[this.settings.colorMode] || colorModes.gradientGlobal)();
+        }
+
+        findClosestCircles(circle, count) {
+            return this.circles
+                .filter(other => other !== circle)
+                .sort((a, b) => {
+                    const dxA = circle.x - a.x;
+                    const dyA = circle.y - a.y;
+                    const distA = Math.sqrt(dxA * dxA + dyA * dyA);
+
+                    const dxB = circle.x - b.x;
+                    const dyB = circle.y - b.y;
+                    const distB = Math.sqrt(dxB * dxB + dyB * dyB);
+
+                    return distA - distB;
+                })
+                .slice(0, count);
+        }
+
+
+
+      distance(a, b) {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+    }
+
+    // Rendre la div des contrôles déplaçable uniquement depuis la drag-handle
+    const controls = document.querySelector('.controls');
+    const dragHandle = document.querySelector('.drag-handle');
+
+    let isDragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    dragHandle.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    controls.classList.add('dragging');
+
+    // Calculer l'offset initial
+    offsetX = e.clientX - controls.offsetLeft;
+    offsetY = e.clientY - controls.offsetTop;
+
+    // Désactiver le comportement par défaut
+    e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        const x = e.clientX - offsetX;
+        const y = e.clientY - offsetY;
+
+        // Appliquer la nouvelle position à la div
+        controls.style.left = `${x}px`;
+        controls.style.top = `${y}px`;
+    }
+    });
+
+    document.addEventListener('mouseup', () => {
+    isDragging = false;
+    controls.classList.remove('dragging');
+    });
+
+
+    
+    // Initialize the application
+    new CanvasManager();
+  </script>
+</body>
+</html>
